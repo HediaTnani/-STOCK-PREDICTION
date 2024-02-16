@@ -1,0 +1,117 @@
+#                      STOCK PREDICTION.
+
+**Import Libraries.**
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from keras.models import Sequential
+from keras.layers import LSTM,Dense
+
+**Load Stock Price data.**
+
+symbol='AAPL'
+url=f'https://query1.finance.yahoo.com/v7/finance/download/{symbol}?period1=0&period2=9999999999&interval=1d&events=history'
+df=pd.read_csv(url,parse_dates=True,index_col='Date')
+
+df
+
+**Select Only Close Price.**
+
+data=df['Close'].values.reshape(-1,1)
+
+data
+
+**Normalize the Data.**
+
+scaler=MinMaxScaler(feature_range=(0,1))
+data_normalized=scaler.fit_transform(data)
+
+scaler
+
+data_normalized
+
+**Function to Create dataset.**
+
+def create_dataset(dataset,back=1):
+    X,Y=[],[]
+    for i in range(len(dataset)-back):
+        a=dataset[i:(i+back),0]
+        X.append(a)
+        Y.append(dataset[i+back,0])
+    return np.array(X),np.array(Y)
+
+    
+
+**Training,testing and Split data.**
+
+train_size=int(len(data_normalized)*0.8)
+test_size=len(data_normalized)-train_size
+train,test=data_normalized[0:train_size,:],data_normalized[train_size:len(data_normalized),:]
+
+back=5
+X_train,Y_train=create_dataset(train,back)
+X_test,Y_test=create_dataset(test,back)
+
+**Reshape input.**
+
+X_train = np.reshape(X_train, (X_train.shape[0], back, 1))
+X_test = np.reshape(X_test, (X_test.shape[0], back, 1))
+
+**Build the LSTM(Long short-Term Memory) model.**
+
+input_shape=(X_train.shape[1],1)
+model=create_lstm_model(input_shape)
+
+def create_lstm_model(input_shape):
+    model = Sequential()
+    model.add(LSTM(50, return_sequences=True, input_shape=input_shape))
+    model.add(LSTM(50, return_sequences=False))
+    model.add(Dense(25))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
+
+**Train The Model.**
+
+model.fit(X_train,Y_train,epochs=10,batch_size=32)
+
+**Evaluate the model on the test set.**
+
+loss = model.evaluate(X_test, Y_test)
+print(f'Mean Squared error on Test Set:{loss}')
+
+**Test Set Prediction.**
+
+Predictions=model.predict(X_test)
+
+Predictions=model.predict(X_train)
+
+**Inverse transform the predictions and actual values.**
+
+Prediction=scaler.inverse_transform(Predictions)
+y_test=scaler.inverse_transform(Y_test.reshape(-1,1))
+
+**Plot the results.**
+
+plt.figure(figsize=(12,6))
+
+plt.plot(Prediction,label='Predicted Data.')
+plt.legend()
+plt.show()
+
+plt.plot(Y_test,label='Actual Data.')
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(12, 6))
+plt.plot(Prediction, label='Predicted Data')
+plt.plot(y_test, label='Actual Data')
+plt.legend()
+plt.title(f'Stock Price Prediction for {symbol}')
+plt.show()
+
